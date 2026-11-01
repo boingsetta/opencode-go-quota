@@ -1,8 +1,10 @@
-# go-quota
+# opencode-go-quota
 
-An OpenCode Desktop GUI plugin. A globe pill sits in the window titlebar (top right).
-Hover it to open a card with three usage bars for your OpenCode Go allowance; click it to
-open the Console usage page.
+An OpenCode Desktop GUI plugin that shows the OpenCode Go allowance in the titlebar. A ring pill sits in the window titlebar (top right):
+the OpenCode mark at the centre, and one arc per Go allowance window around it — monthly
+in white at the base, weekly in amber, and the rolling 5-hour window in blue on top.
+Hover it to open a card with the same numbers as bars; click it to open the Console usage
+page.
 
 ![hover card](docs/placement.png)
 
@@ -27,33 +29,51 @@ location resolves to, and it degrades cleanly when that is nothing.
 
 | Server answer | Pill | Card |
 |---|---|---|
-| workspace + Go meters | `OpenCode Go · 21%` | three bars |
-| workspace, no Go plan | `OpenCode Go · 未订阅` | Console budget bar, or a "no plan" note |
-| `data: null` (no Console login) | lock icon | 未登录 |
-| request failed | x icon | 获取失败 |
+| workspace + Go meters | ring + `OpenCode Go · 21%` | three bars |
+| workspace, no Go plan | dimmed ring + `OpenCode Go · 未订阅` | Console budget bar, or a "no plan" note |
+| `data: null` (no Console login) | dimmed ring + `OpenCode Go · 未登录` | 未登录 |
+| request failed | dimmed ring + `OpenCode Go · 获取失败` | 获取失败 |
+| limit reached | red mark + `OpenCode Go · 已达上限` | 已达上限 |
 
 ## The card
 
 ```
 OpenCode Go                              GO
 Default · zcodeplayground
-滚动 5 小时                          3.0%
+滚动 5 小时          3.0% · 4 小时后重置
 ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-4 小时后重置
-本周                                  1.0%
+本周                 1.0% · 5 天后重置
 ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-5 天后重置
-本月                                  0%
+本月                 0% · 30 天后重置
 ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-30 天后重置
 更新于 刚刚                            打开 Console
 ```
 
-- Bars turn amber from 70% and red from 90%; a reached monthly limit turns the pill into a
-  ban icon and the card says 已达上限.
+- The card follows the app's v2 `usage-dialog` style: 13px/440 type, 0.5px dividers,
+  native `background-bg-base` / `border-border-base` / `elevation-floating` tokens,
+  and 8px square bars filled with `background-bg-inverse` (white in dark theme).
+  A reached limit turns the value and bar red.
+- The card uses the app's CSS variables, so it follows the current light or dark theme.
 - Percentages below 1% keep two decimals (`0.03%`), so light usage is visible.
 - Refreshes every `refreshSeconds`, when the active session changes, and when the window
   regains focus (at most once every 15 s).
+
+## The titlebar icon
+
+`TitlebarItem.icon` only accepts one of the app's built-in icon names, so the ring is a
+small inline SVG that the plugin injects into its own pill:
+
+- 24 × 24 px, with the OpenCode mark in the centre;
+- a neutral 3.4 px track, then three arcs on the same centreline, clockwise from 12 o'clock;
+- monthly in white at 3.4 px (base), weekly in amber at 2.2 px, rolling 5 hours in blue at
+  1.2 px (top);
+- each arc spans its own percentage, so the exposed edge of a wider lower layer shows how
+  the shorter window compares with the longer one;
+- loading hides the ring for the built-in spinner, missing data dims it, and a limit turns
+  the mark red.
+
+The injection only targets horizontal titlebars. On a vertical titlebar the standard icon
+stays, so the plugin keeps working on layouts this patch does not cover.
 
 ## Options
 
@@ -63,10 +83,10 @@ All optional, set on the plugin entry:
 {
   "plugins": [
     {
-      "package": "D:\\software\\opencode-go-usage",
+      "package": "C:\\tools\\opencode-go-quota",
       "options": {
         "refreshSeconds": 60,
-        "location": "D:\\work\\client-a",
+        "location": "C:\\work\\client-a",
         "openUrl": "https://opencode.ai/console"
       }
     }
@@ -115,8 +135,9 @@ account currently active for the location.
 
 ### From the release zip (no Node, no npm)
 
-1. Extract so the folder ends up at `%USERPROFILE%\.config\opencode\plugins\go-quota\`.
-   It must contain `package.json` and `dist/gui-experimental.cjs` directly.
+1. Extract the archive under `%USERPROFILE%\.config\opencode\plugins\`. The folder name is
+   arbitrary (the archive root is `opencode-go-quota`); it must contain `package.json` and
+   `dist/gui-experimental.cjs` directly.
 2. Start or restart OpenCode Desktop.
 
 Nothing else — package directories under `~/.config/opencode/plugins/` are discovered
@@ -131,31 +152,41 @@ Extract anywhere permanent and point the global config at the directory:
 
 ```jsonc
 {
-  "plugins": ["D:\\tools\\go-quota"]
+  "plugins": ["C:\\tools\\opencode-go-quota"]
 }
 ```
 
 Relative paths resolve from the config file; a path to a single file is skipped.
 
-### From npm or git
+### From GitHub
+
+The built bundle is committed under `dist/`, so the repository can be installed directly:
 
 ```powershell
-npm publish --access public        # after renaming to a free, e.g. @you/opencode-go-quota
-opencode plugin add @you/opencode-go-quota
+opencode plugin add github:boingsetta/opencode-go-quota
 ```
 
-`opencode plugin add` also accepts npm-compatible git targets, so `github:you/go-quota` works
-if `dist/gui-experimental.cjs` is committed.
+Or clone it into the plugins directory:
+
+```powershell
+git clone https://github.com/boingsetta/opencode-go-quota `
+  "$env:USERPROFILE\.config\opencode\plugins\go-quota"
+```
+
+Restart OpenCode Desktop. The directory contains `package.json` and
+`dist/gui-experimental.cjs`; no build step is needed for installation.
 
 ### From source
 
 ```powershell
-cd D:\software\opencode-go-usage
+git clone https://github.com/boingsetta/opencode-go-quota
+cd opencode-go-quota
 npm install
-npx vite build
+npm run build
 ```
 
-The desktop app reloads plugins when the config or the bundle changes, so no restart is needed.
+`npm run build` writes `dist/gui-experimental.cjs`. The desktop app reloads plugins when the
+bundle changes, so no restart is needed after a rebuild.
 
 ## How the hover works
 
@@ -190,3 +221,8 @@ Remove the `plugins` entry, or turn the GUI off in **Settings › Extensions ›
   are switched in OpenCode itself, not from this card — the credential API returns secrets,
   so the plugin deliberately does not read it.
 - Requires OpenCode Desktop 2.x with a signed-in Console account for `usage.limits` to return data.
+
+## Links
+
+- Repository: https://github.com/boingsetta/opencode-go-quota
+- License: MIT, see [`LICENSE`](LICENSE).

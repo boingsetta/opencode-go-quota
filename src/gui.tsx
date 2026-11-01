@@ -22,57 +22,93 @@ type State =
   | { kind: "ready"; info: Info }
   | { kind: "error"; message: string }
 
-const CSS = `
-.goq-card {
+const CSS = `.goq-card {
   position: fixed;
   top: 46px;
   right: 14px;
-  width: 330px;
+  width: 340px;
   z-index: 2147483000;
-  padding: 14px 16px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: #15171c;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
-  color: #e8edf6;
-  font: 12px/1.45 ui-sans-serif, "Segoe UI", system-ui, sans-serif;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--v2-background-bg-base, #161616);
+  box-shadow: var(--v2-elevation-floating, 0 8px 16px rgba(0, 0, 0, 0.16), 0 4px 8px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.12));
+  color: var(--v2-text-text-base, #fafafa);
+  font-family: var(--font-family-sans, "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif);
+  font-size: 13px;
+  font-weight: 440;
+  line-height: 16px;
+  letter-spacing: -0.04px;
   opacity: 0;
   transform: translateY(-6px) scale(0.985);
   pointer-events: none;
   transition: opacity 0.12s ease, transform 0.12s ease;
 }
 .goq-card[data-open="true"] { opacity: 1; transform: none; pointer-events: auto; }
-.goq-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.goq-title { font-size: 13px; font-weight: 600; letter-spacing: 0.1px; }
-.goq-plan { font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase;
-  padding: 2px 7px; border-radius: 999px; color: #93c5fd; background: rgba(59, 130, 246, 0.16);
-  border: 1px solid rgba(59, 130, 246, 0.35); }
-.goq-ws { margin-top: 3px; font-size: 11px; color: #7d8aa3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.goq-ws-sub { color: #5b6779; }
-.goq-rows { margin-top: 12px; display: grid; gap: 11px; }
-.goq-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.goq-label { font-size: 11.5px; color: #a9b6cc; }
-.goq-value { font-size: 11.5px; font-variant-numeric: tabular-nums; color: #dbe4f2; }
-.goq-value[data-tone="warn"] { color: #fbbf24; }
-.goq-value[data-tone="danger"] { color: #f87171; }
-.goq-track { margin-top: 5px; height: 6px; border-radius: 999px; overflow: hidden;
-  background: rgba(255, 255, 255, 0.07); }
-.goq-fill { height: 100%; border-radius: 999px; transition: width 0.35s ease;
-  background: linear-gradient(90deg, #2563eb, #60a5fa); }
-.goq-fill[data-tone="warn"] { background: linear-gradient(90deg, #d97706, #fbbf24); }
-.goq-fill[data-tone="danger"] { background: linear-gradient(90deg, #dc2626, #f87171); }
-.goq-reset { margin-top: 4px; font-size: 10.5px; color: #6b788f; }
-.goq-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.07);
-  display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10.5px; color: #6b788f; }
-.goq-link { color: #7aa7f7; cursor: pointer; text-decoration: none; }
-.goq-link:hover { text-decoration: underline; }
-.goq-empty { margin-top: 10px; font-size: 11.5px; color: #9aa7bd; }
+.goq-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 0; }
+.goq-title { font-size: 13px; font-weight: 530; letter-spacing: -0.04px; color: var(--v2-text-text-base, #fafafa); }
+.goq-plan {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: var(--v2-background-bg-layer-03, #3a3a3a);
+  color: var(--v2-text-text-muted, #aeaeae);
+  font-size: 11px;
+  font-weight: 530;
+  line-height: 12px;
+  letter-spacing: 0.05px;
+  text-transform: uppercase;
+}
+.goq-ws { margin: 0; padding: 2px 14px 10px; font-size: 13px; color: var(--v2-text-text-muted, #aeaeae); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.goq-ws-sub { color: var(--v2-text-text-faint, #808080); }
+.goq-rows { padding: 0 0 4px; }
+.goq-row { padding: 10px 14px; border-top: 0.5px solid var(--v2-border-border-base, rgba(255, 255, 255, 0.10)); }
+.goq-rows .goq-row:first-child { border-top: 0; padding-top: 4px; }
+.goq-row-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.goq-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 530; color: var(--v2-text-text-base, #fafafa); }
+.goq-status { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 13px; }
+.goq-value { font-size: 13px; font-weight: 530; font-variant-numeric: tabular-nums; color: var(--v2-text-text-base, #fafafa); }
+.goq-value[data-tone="danger"] { color: var(--v2-state-fg-danger, #f87171); }
+.goq-dot { width: 3px; height: 3px; flex-shrink: 0; border-radius: 50%; background: var(--v2-icon-icon-muted, #808080); }
+.goq-reset { font-size: 13px; font-weight: 440; color: var(--v2-text-text-muted, #aeaeae); white-space: nowrap; }
+.goq-track { margin-top: 8px; height: 8px; border-radius: 2px; overflow: hidden; background: var(--v2-background-bg-layer-03, #3a3a3a); }
+.goq-fill { height: 100%; border-radius: 2px; background: var(--v2-background-bg-inverse, #fafafa); transition: width 0.35s ease; }
+.goq-fill[data-tone="danger"] { background: var(--v2-state-fg-danger, #f87171); }
+.goq-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px 12px; border-top: 0.5px solid var(--v2-border-border-base, rgba(255, 255, 255, 0.10)); font-size: 13px; color: var(--v2-text-text-faint, #808080); }
+.goq-link { color: var(--v2-text-text-muted, #aeaeae); cursor: pointer; text-decoration: none; }
+.goq-link:hover { color: var(--v2-text-text-base, #fafafa); text-decoration: underline; text-underline-offset: 2px; }
+.goq-empty { padding: 4px 14px 10px; font-size: 13px; color: var(--v2-text-text-muted, #aeaeae); }
+
+[data-slot="titlebar-update"]:not(.self-start):has(> button[aria-label^="OpenCode Go"]) {
+  width: 24px;
+  height: 24px;
+}
+[data-slot="titlebar-update"]:not(.self-start):has(> button[aria-label^="OpenCode Go"]):hover,
+[data-slot="titlebar-update"]:not(.self-start):has(> button[aria-label^="OpenCode Go"]):focus-within {
+  width: max-content;
+}
+[data-slot="titlebar-update"]:not(.self-start):has(> button[aria-label^="OpenCode Go"]) > button > span:not([data-slot]) {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+[data-slot="titlebar-update"]:not(.self-start):has(> button[aria-label^="OpenCode Go"]) > button > span:not([data-slot]) > svg:not(.goq-ring) {
+  display: none;
+}
+.goq-ring { position: absolute; inset: 0; width: 24px; height: 24px; pointer-events: none; overflow: visible; }
+.goq-ring .goq-arc { fill: none; stroke-linecap: round; transition: stroke-dasharray 0.35s ease, opacity 0.2s ease; }
+.goq-ring .goq-track { fill: none; stroke: rgba(255, 255, 255, 0.12); stroke-width: 3.4; }
+.goq-ring .goq-month { stroke: #ffffff; stroke-width: 3.4; }
+.goq-ring .goq-week { stroke: #f59e0b; stroke-width: 2.2; }
+.goq-ring .goq-roll { stroke: #60a5fa; stroke-width: 1.2; }
+.goq-ring .goq-logo { fill: currentColor; opacity: 0.92; }
+.goq-ring.goq-limited .goq-logo { fill: #f87171; }
 `
 
 const escape = (value: string) =>
   value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] as string)
-
-const tone = (percent: number) => (percent >= 90 ? "danger" : percent >= 70 ? "warn" : "ok")
 
 export default Plugin.define({
   i18n: {
@@ -257,16 +293,95 @@ export default Plugin.define({
     card.dataset.open = "false"
     document.body.appendChild(card)
 
+    /* ---------- ring icon (the titlebar only accepts built-in icon names) ---------- */
+
+    const SVG_NS = "http://www.w3.org/2000/svg"
+    const ring = document.createElementNS(SVG_NS, "svg") as SVGSVGElement
+    ring.setAttribute("viewBox", "0 0 24 24")
+    ring.setAttribute("class", "goq-ring")
+    ring.setAttribute("aria-hidden", "true")
+    ring.innerHTML =
+      '<circle class="goq-track" cx="12" cy="12" r="9.4"/>' +
+      '<circle class="goq-arc goq-month" cx="12" cy="12" r="9.4" transform="rotate(-90 12 12)"/>' +
+      '<circle class="goq-arc goq-week" cx="12" cy="12" r="9.4" transform="rotate(-90 12 12)"/>' +
+      '<circle class="goq-arc goq-roll" cx="12" cy="12" r="9.4" transform="rotate(-90 12 12)"/>' +
+      '<g class="goq-logo" transform="translate(5.7 5.7) scale(0.7875)">' +
+      '<g transform="translate(1.2 1.2) scale(0.85)">' +
+      '<path opacity="0.2" d="M11.1999 12.8H4.79993V6.40002H11.1999V12.8Z"/>' +
+      '<path d="M11.2 3.2H4.79998V12.8H11.2V3.2ZM14.4 16H1.59998V0H14.4V16Z"/>' +
+      "</g></g>"
+
+    const monthArc = ring.querySelector<SVGCircleElement>(".goq-month")!
+    const weekArc = ring.querySelector<SVGCircleElement>(".goq-week")!
+    const rollArc = ring.querySelector<SVGCircleElement>(".goq-roll")!
+    for (const circle of [monthArc, weekArc, rollArc]) circle.setAttribute("pathLength", "100")
+
+    const ringHost = (): HTMLElement | null => {
+      const items = document.querySelectorAll<HTMLElement>('[data-slot="titlebar-update"]')
+      for (const item of items) {
+        if (item.classList.contains("self-start")) continue
+        const button = item.querySelector<HTMLElement>('button[aria-label^="OpenCode Go"]')
+        if (!button) continue
+        for (const child of Array.from(button.children)) {
+          if (child.tagName === "SPAN" && !child.hasAttribute("data-slot")) return child as HTMLElement
+        }
+      }
+      return null
+    }
+
+    const setArc = (circle: SVGCircleElement, value: number) => {
+      const pct = Math.max(0, Math.min(100, Number(value) || 0))
+      circle.setAttribute("stroke-dasharray", `${pct} ${100 - pct}`)
+      circle.style.opacity = pct > 0 ? "1" : "0"
+    }
+
+    const meterPercent = (meter: Meter | undefined) => {
+      const value = meter ? Number(meter.percent) : 0
+      return Number.isFinite(value) ? value : 0
+    }
+
+    let lastRingSignature = ""
+    const paintRing = () => {
+      const host = ringHost()
+      if (!host) return
+      if (ring.parentNode !== host) host.appendChild(ring)
+
+      const current = state()
+      const go = current.kind === "ready" ? current.info.go : undefined
+      const monthly = meterPercent(go?.monthly)
+      const weekly = meterPercent(go?.weekly)
+      const rolling = meterPercent(go?.rolling)
+      const limited = !!go && (go.monthly.limited || go.weekly.limited || go.rolling.limited)
+      const loading = current.kind === "loading"
+      const signature = `${current.kind}|${monthly}|${weekly}|${rolling}|${limited}`
+      if (signature === lastRingSignature) return
+      lastRingSignature = signature
+
+      setArc(monthArc, monthly)
+      setArc(weekArc, weekly)
+      setArc(rollArc, rolling)
+      ring.style.display = loading ? "none" : "block"
+      ring.classList.toggle("goq-limited", limited)
+      ring.style.opacity = current.kind === "ready" && go ? "1" : "0.55"
+    }
+
+    paintRing()
+    const ringTimer = setInterval(paintRing, 500)
+
     const bar = (label: string, meter: Meter) => {
       const value = Math.max(0, Math.min(100, meter.percent))
-      const level = meter.limited ? "danger" : tone(meter.percent)
+      const level = meter.limited ? "danger" : "ok"
+      const reset = `${ctx.t("card.reset.before")}${relative(meter.resetsAt)}${ctx.t("card.reset.after")}`
       return `<div class="goq-row">
         <div class="goq-row-head">
           <span class="goq-label">${escape(label)}</span>
-          <span class="goq-value" data-tone="${level}">${meter.limited ? ctx.t("card.limited") : percent(meter.percent)}</span>
+          <span class="goq-status">
+            <span class="goq-value" data-tone="${level}">${meter.limited ? ctx.t("card.limited") : percent(meter.percent)}</span>
+            <span class="goq-dot" aria-hidden="true"></span>
+            <span class="goq-reset">${escape(reset)}</span>
+          </span>
         </div>
         <div class="goq-track"><div class="goq-fill" data-tone="${level}" style="width:${value}%"></div></div>
-        <div class="goq-reset">${escape(`${ctx.t("card.reset.before")}${relative(meter.resetsAt)}${ctx.t("card.reset.after")}`)}</div>
       </div>`
     }
 
@@ -443,12 +558,14 @@ export default Plugin.define({
     return () => {
       disposed = true
       clearInterval(timer)
+      clearInterval(ringTimer)
       if (closeTimer !== undefined) clearTimeout(closeTimer)
       if (frame) cancelAnimationFrame(frame)
       window.removeEventListener("pointermove", onMove)
       document.removeEventListener("pointerleave", onLeave)
       window.removeEventListener("blur", onLeave)
       window.removeEventListener("focus", onFocus)
+      ring.remove()
       card.remove()
       style.remove()
     }
