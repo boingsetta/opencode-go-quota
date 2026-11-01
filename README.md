@@ -30,11 +30,11 @@ opencode plugin add github:boingsetta/opencode-go-quota
 
 如果 OpenCode 没有登录 Console，或者你想直接使用 OpenCode Go API Key：
 
-1. 打开命令面板。
-2. 选择 **OpenCode Go: 设置 OpenCode Go API Key**。
-3. 粘贴 API Key，点击“提交”。
+1. 悬停标题栏的环形图标，打开额度卡片。
+2. 点击卡片底部的 **使用 API Key**。
+3. 在卡片里粘贴 API Key，点击 **登录**。
 
-API Key 模式优先于 Console 登录。密钥会以明文保存在本地，并只发送到 `https://opencode.ai/zen/go/v1/usage`。要回到 Console 登录，运行 **OpenCode Go: 清除 OpenCode Go API Key**。
+也可以打开命令面板，选择 **OpenCode Go: 设置 OpenCode Go API Key**。API Key 模式优先于 Console 登录。密钥会以明文保存在本地，并只发送到 `https://opencode.ai/zen/go/v1/usage`。要回到 Console 登录，点击卡片底部的 **退出 API Key**，或运行 **OpenCode Go: 清除 OpenCode Go API Key**。
 
 要求 OpenCode Desktop 2.x。额度接口目前是实验性接口，官方响应格式变化时插件可能需要适配。
 
@@ -156,10 +156,11 @@ The plugin ships no credentials. It supports two modes:
   session the app already holds. Each user needs OpenCode Desktop 2.x, a signed-in Console
   account — **Account** in the app, or `/connect` → **OpenCode Console** in the TUI — and a
   Go or Go Plus subscription.
-- **API key:** open the command palette and choose **OpenCode Go: Set OpenCode Go API Key**.
-  The key is stored locally in plain text and sent only to
-  `https://opencode.ai/zen/go/v1/usage`. Use **OpenCode Go: Forget OpenCode Go API Key** to
-  return to Console mode.
+- **API key:** hover the titlebar ring, click **Use API key** at the bottom of the card, paste
+  the key into the card, and press **Sign in**. The command palette also has **OpenCode Go:
+  Set OpenCode Go API Key**. The key is stored locally in plain text and sent only to
+  `https://opencode.ai/zen/go/v1/usage`. Click **Sign out** in the card, or use **OpenCode Go:
+  Forget OpenCode Go API Key**, to return to Console mode.
 
 `usage.limits` returns `data: null` for a location with no Console sign-in, and the card shows
 **未登录** with links to the Console and API-key login. Switching Console accounts happens in

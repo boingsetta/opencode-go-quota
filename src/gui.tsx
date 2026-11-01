@@ -119,6 +119,33 @@ const CSS = `.goq-card {
 .goq-link { color: var(--v2-text-text-muted, #aeaeae); cursor: pointer; text-decoration: none; }
 .goq-link:hover { color: var(--v2-text-text-base, #fafafa); text-decoration: underline; text-underline-offset: 2px; }
 .goq-empty { padding: 4px 14px 10px; font-size: 13px; color: var(--v2-text-text-muted, #aeaeae); }
+.goq-login { display: grid; gap: 8px; padding: 4px 14px 10px; }
+.goq-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--v2-border-border-base, rgba(255, 255, 255, 0.14));
+  border-radius: 6px;
+  background: var(--v2-background-bg-layer-02, #232323);
+  color: var(--v2-text-text-base, #fafafa);
+  font: inherit;
+  outline: none;
+}
+.goq-input::placeholder { color: var(--v2-text-text-faint, #808080); }
+.goq-input:focus { border-color: var(--v2-border-border-focus, #5b5ef4); }
+.goq-btn {
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--v2-background-bg-inverse, #fafafa);
+  color: var(--v2-text-text-inverse, #161616);
+  font: inherit;
+  font-weight: 530;
+  cursor: pointer;
+}
+.goq-btn:hover { opacity: 0.9; }
+.goq-error { min-height: 16px; color: var(--v2-state-fg-danger, #f87171); font-size: 12px; }
+.goq-foot-links { display: inline-flex; align-items: center; gap: 12px; }
 
 [data-slot="titlebar-update"]:not(.self-start):has(> button[aria-label^="OpenCode Go"]) {
   width: 24px;
@@ -179,6 +206,8 @@ export default Plugin.define({
       "unit.day": "d",
       "unit.now": "just now",
       "login.action": "Use API key",
+      "login.submit": "Sign in",
+      "login.signOut": "Sign out",
       "login.title": "OpenCode Go API key",
       "login.description": "Paste your OpenCode Go API key. It is stored locally in plain text.",
       "login.placeholder": "sk-...",
@@ -220,6 +249,8 @@ export default Plugin.define({
       "unit.day": "天",
       "unit.now": "刚刚",
       "login.action": "使用 API Key",
+      "login.submit": "登录",
+      "login.signOut": "退出 API Key",
       "login.title": "OpenCode Go API Key",
       "login.description": "粘贴你的 OpenCode Go API Key。它会以明文保存在本地。",
       "login.placeholder": "sk-...",
@@ -240,6 +271,7 @@ export default Plugin.define({
       fetch: async ({ apiKey }) => {
         const response = await fetch(USAGE_URL, {
           headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+          signal: AbortSignal.timeout(15_000),
         })
         if (!response.ok) {
           throw new Error(response.status === 401 ? "invalid api key" : `HTTP ${response.status}`)
@@ -251,6 +283,8 @@ export default Plugin.define({
   setup(ctx) {
     const [state, setState] = createSignal<State>({ kind: "loading" })
     const [updatedAt, setUpdatedAt] = createSignal<number>(0)
+    const [showLogin, setShowLogin] = createSignal(false)
+    const [loginError, setLoginError] = createSignal<string | undefined>()
     const usage = ctx.main(usageIpc(ctx.id))
     let disposed = false
 
@@ -320,20 +354,28 @@ export default Plugin.define({
 
     /* ---------- API key login ---------- */
 
-    const login = async () => {
-      const key = await ctx.dialogs.prompt({
-        title: ctx.t("login.title"),
-        description: ctx.t("login.description"),
-        placeholder: ctx.t("login.placeholder"),
-        secret: true,
-      })
-      const next = key?.trim()
+    const showInlineError = (message: string) => {
+      const element = document.querySelector<HTMLElement>('.goq-card [data-role="login-error"]')
+      if (element) element.textContent = message
+    }
+
+    const saveKey = async (input: string, inline = false) => {
+      const next = input.trim()
       if (!next) return
+      setLoginError(undefined)
+      showInlineError("")
 
       try {
         await usage.fetch({ apiKey: next })
       } catch {
-        ctx.toast.show({ variant: "error", title: ctx.t("login.invalid") })
+        const message = ctx.t("login.invalid")
+        setLoginError(message)
+        if (inline) showInlineError(message)
+        else {
+          setShowLogin(true)
+          render()
+        }
+        ctx.toast.show({ variant: "error", title: message })
         return
       }
 
@@ -343,10 +385,22 @@ export default Plugin.define({
       } catch {
         // Storage can be unavailable in restricted windows; the key still works for this session.
       }
+      setShowLogin(false)
+      setLoginError(undefined)
       setState({ kind: "loading" })
       render()
       void load()
       ctx.toast.show({ variant: "success", title: ctx.t("login.saved") })
+    }
+
+    const login = async () => {
+      const key = await ctx.dialogs.prompt({
+        title: ctx.t("login.title"),
+        description: ctx.t("login.description"),
+        placeholder: ctx.t("login.placeholder"),
+        secret: true,
+      })
+      if (key) await saveKey(key, false)
     }
 
     const logout = () => {
@@ -360,6 +414,8 @@ export default Plugin.define({
       } catch {
         // Ignore storage failures; the in-memory key is already cleared.
       }
+      setShowLogin(false)
+      setLoginError(undefined)
       setState({ kind: "loading" })
       render()
       void load()
@@ -539,11 +595,23 @@ export default Plugin.define({
 
     const render = () => {
       const current = state()
+      const error = loginError()
+      const loginForm = `<div class="goq-login">
+        <input class="goq-input" data-role="api-key" type="password" placeholder="${escape(ctx.t("login.placeholder"))}" autocomplete="off" spellcheck="false" />
+        <button class="goq-btn" data-act="save-key">${escape(ctx.t("login.submit"))}</button>
+        <div class="goq-error" data-role="login-error">${error ? escape(error) : ""}</div>
+      </div>`
       const footer = `<div class="goq-foot">
         <span>${escape(`${ctx.t("card.updated")}${ago(updatedAt())}`)}</span>
-        <a class="goq-link" data-act="open">${escape(ctx.t("card.console"))}</a>
+        <span class="goq-foot-links">
+          ${current.kind === "ready" && !showLogin()
+            ? apiKey
+              ? `<a class="goq-link" data-act="logout">${escape(ctx.t("login.signOut"))}</a>`
+              : `<a class="goq-link" data-act="toggle-login">${escape(ctx.t("login.action"))}</a>`
+            : ""}
+          <a class="goq-link" data-act="open">${escape(ctx.t("card.console"))}</a>
+        </span>
       </div>`
-      const loginLink = `<a class="goq-link" data-act="login">${escape(ctx.t("login.action"))}</a>`
 
       if (current.kind === "loading") {
         card.innerHTML = `<div class="goq-head"><span class="goq-title">${escape(ctx.t("card.title"))}</span></div>
@@ -552,12 +620,12 @@ export default Plugin.define({
       }
       if (current.kind === "anon") {
         card.innerHTML = `<div class="goq-head"><span class="goq-title">${escape(ctx.t("card.title"))}</span></div>
-          <div class="goq-empty">${escape(ctx.t("card.anon"))} ${loginLink}</div>${footer}`
+          <div class="goq-empty">${escape(ctx.t("card.anon"))}</div>${loginForm}${footer}`
         return
       }
       if (current.kind === "error") {
         card.innerHTML = `<div class="goq-head"><span class="goq-title">${escape(ctx.t("card.title"))}</span></div>
-          <div class="goq-empty">${escape(ctx.t("card.error"))} ${loginLink}</div>${footer}`
+          <div class="goq-empty">${escape(ctx.t("card.error"))}</div>${loginForm}${footer}`
         return
       }
 
@@ -585,7 +653,7 @@ export default Plugin.define({
               <div class="goq-track"><div class="goq-fill" style="width:${Math.min(100, (budget.spent / Math.max(budget.limit, 0.01)) * 100)}%"></div></div>
             </div>`
           : `<div class="goq-empty">${escape(ctx.t("card.noPlan"))}</div>`
-        card.innerHTML = `${header}<div class="goq-rows">${budgetRow}</div>${footer}`
+        card.innerHTML = `${header}<div class="goq-rows">${budgetRow}</div>${showLogin() ? loginForm : ""}${footer}`
         return
       }
 
@@ -594,7 +662,7 @@ export default Plugin.define({
           ${bar(ctx.t("card.rolling"), go.rolling)}
           ${bar(ctx.t("card.weekly"), go.weekly)}
           ${bar(ctx.t("card.monthly"), go.monthly)}
-        </div>${footer}`
+        </div>${showLogin() ? loginForm : ""}${footer}`
     }
 
     // A short close delay lets the pointer cross the gap between the pill and the card.
@@ -616,15 +684,45 @@ export default Plugin.define({
 
     card.addEventListener("click", (event) => {
       const target = event.target as HTMLElement | null
-      if (target?.dataset.act === "login") {
+      const action = target?.dataset.act
+      if (action === "toggle-login") {
         event.preventDefault()
-        void login()
+        setShowLogin(!showLogin())
+        setLoginError(undefined)
+        render()
         return
       }
-      if (target?.dataset.act === "open") {
+      if (action === "save-key") {
+        event.preventDefault()
+        const input = card.querySelector<HTMLInputElement>('[data-role="api-key"]')
+        if (input) void saveKey(input.value, true)
+        return
+      }
+      if (action === "logout") {
+        event.preventDefault()
+        logout()
+        return
+      }
+      if (action === "open") {
         event.preventDefault()
         ctx.system.openExternal(usageURL())
       }
+    })
+
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return
+      const target = event.target as HTMLInputElement | null
+      if (target?.dataset.role !== "api-key") return
+      event.preventDefault()
+      void saveKey(target.value, true)
+    })
+
+    card.addEventListener("input", (event) => {
+      const target = event.target as HTMLInputElement | null
+      if (target?.dataset.role !== "api-key") return
+      const error = card.querySelector<HTMLElement>('[data-role="login-error"]')
+      if (error) error.textContent = ""
+      setLoginError(undefined)
     })
 
     let pill: HTMLElement | null = null
