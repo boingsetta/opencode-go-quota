@@ -8,6 +8,26 @@ page.
 
 ![hover card](docs/placement.png)
 
+## 中文说明
+
+在 OpenCode Desktop 标题栏显示 OpenCode Go 额度。环形图标中，本月为白色底弧、本周为琥珀色、滚动 5 小时为蓝色顶层；悬停可查看三个窗口的用量百分比和重置倒计时，点击可打开 Console 用量页。
+
+- 不需要单独配置 API Key，复用 OpenCode 已登录的 Console 账号
+- 自动跟随当前会话所在的工作区
+- 每 60 秒刷新；切换会话或窗口重新获得焦点时也会刷新
+- 支持简体中文 / English，跟随 OpenCode 界面语言
+- 不读取、不保存任何凭据
+
+安装：
+
+```powershell
+opencode plugin add github:boingsetta/opencode-go-quota
+```
+
+或下载 [最新 Release](https://github.com/boingsetta/opencode-go-quota/releases/latest) 中的 zip，解压到 `%USERPROFILE%\.config\opencode\plugins\`，然后重启 OpenCode Desktop。
+
+要求 OpenCode Desktop 2.x。额度接口目前是实验性接口，官方响应格式变化时插件可能需要适配。
+
 ## Whose quota is it?
 
 The numbers come from `GET /api/experimental/usage/limits`, which answers one question:
