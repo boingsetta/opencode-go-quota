@@ -1,7 +1,7 @@
 {
   "name": "opencode-go-quota",
-  "version": "0.3.1",
-  "description": "OpenCode Desktop titlebar ring and hover card for the OpenCode Go allowance of the signed-in Console workspace.",
+  "version": "0.3.2",
+  "description": "OpenCode Desktop titlebar ring and hover card for OpenCode Go allowance, with Console or API-key login.",
   "type": "module",
   "license": "MIT",
   "keywords": [

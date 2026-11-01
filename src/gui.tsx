@@ -1,7 +1,10 @@
 import { createSignal } from "solid-js"
-import { Command, createKeyed, Plugin, TitlebarItem, type IconName } from "@opencode/plugin/gui"
+import { Schema } from "effect"
+import { Command, createKeyed, Ipc, Plugin, TitlebarItem, type IconName } from "@opencode/plugin/gui"
 
 const CONSOLE_URL = "https://opencode.ai/console"
+const USAGE_URL = "https://opencode.ai/zen/go/v1/usage"
+const API_KEY_STORAGE = "go-quota.apiKey"
 const ANCHOR_PREFIX = "OpenCode Go"
 
 interface Meter {
@@ -10,11 +13,46 @@ interface Meter {
   readonly resetsAt: number
 }
 
+interface ApiMeter {
+  readonly status?: string
+  readonly percent?: number
+  readonly resetsAt?: string
+}
+
+interface ApiUsage {
+  readonly rolling?: ApiMeter
+  readonly weekly?: ApiMeter
+  readonly monthly?: ApiMeter
+}
+
 interface Info {
   readonly workspace: { readonly id: string; readonly name?: string; readonly usageURL: string }
   readonly go?: { readonly rolling: Meter; readonly weekly: Meter; readonly monthly: Meter }
   readonly budgets: ReadonlyArray<{ readonly limit: number; readonly spent: number }>
 }
+
+const toMeter = (meter: ApiMeter | undefined): Meter => {
+  const percent = Number(meter?.percent ?? 0)
+  const reset = meter?.resetsAt ? Date.parse(meter.resetsAt) : 0
+  return {
+    percent: Number.isFinite(percent) ? percent : 0,
+    limited: meter?.status === "limited" || meter?.status === "limit_reached",
+    resetsAt: Number.isFinite(reset) ? reset : 0,
+  }
+}
+
+// The usage endpoint cannot be called from the window: its CORS preflight rejects
+// the Authorization header. The main process fetches it and hands the JSON back.
+const usageIpc = (id: string) =>
+  Ipc.define({
+    id: `${id}.usage`,
+    methods: {
+      fetch: {
+        input: Schema.Struct({ apiKey: Schema.String }),
+        output: Schema.Unknown,
+      },
+    },
+  })
 
 type State =
   | { kind: "loading" }
@@ -61,6 +99,7 @@ const CSS = `.goq-card {
   letter-spacing: 0.05px;
   text-transform: uppercase;
 }
+.goq-badges { display: inline-flex; align-items: center; gap: 4px; }
 .goq-ws { margin: 0; padding: 2px 14px 10px; font-size: 13px; color: var(--v2-text-text-muted, #aeaeae); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .goq-ws-sub { color: var(--v2-text-text-faint, #808080); }
 .goq-rows { padding: 0 0 4px; }
@@ -133,13 +172,25 @@ export default Plugin.define({
       "card.budget": "Console budget",
       "card.console": "Open Console",
       "card.updated": "updated ",
+      "card.api": "API",
+      "card.apiWorkspace": "API key",
       "unit.minute": "min",
       "unit.hour": "h",
       "unit.day": "d",
       "unit.now": "just now",
+      "login.action": "Use API key",
+      "login.title": "OpenCode Go API key",
+      "login.description": "Paste your OpenCode Go API key. It is stored locally in plain text.",
+      "login.placeholder": "sk-...",
+      "login.saved": "API key saved",
+      "login.removed": "API key removed",
+      "login.invalid": "API key rejected",
+      "login.configured": "API key is configured in opencode.json",
       "command.group": "OpenCode Go",
       "command.refresh": "Refresh OpenCode Go quota",
       "command.open": "Open OpenCode Go usage in Console",
+      "command.login": "Set OpenCode Go API key",
+      "command.logout": "Forget OpenCode Go API key",
     },
     zh: {
       "pill.head": "OpenCode Go",
@@ -162,18 +213,45 @@ export default Plugin.define({
       "card.budget": "Console 预算",
       "card.console": "打开 Console",
       "card.updated": "更新于 ",
+      "card.api": "API",
+      "card.apiWorkspace": "API 密钥",
       "unit.minute": "分钟",
       "unit.hour": "小时",
       "unit.day": "天",
       "unit.now": "刚刚",
+      "login.action": "使用 API Key",
+      "login.title": "OpenCode Go API Key",
+      "login.description": "粘贴你的 OpenCode Go API Key。它会以明文保存在本地。",
+      "login.placeholder": "sk-...",
+      "login.saved": "API Key 已保存",
+      "login.removed": "API Key 已清除",
+      "login.invalid": "API Key 无效",
+      "login.configured": "API Key 已在 opencode.json 中配置",
       "command.group": "OpenCode Go",
       "command.refresh": "刷新 OpenCode Go 额度",
       "command.open": "在 Console 中查看 OpenCode Go 用量",
+      "command.login": "设置 OpenCode Go API Key",
+      "command.logout": "清除 OpenCode Go API Key",
     },
+  },
+  main(ctx) {
+    const usage = usageIpc(ctx.id)
+    ctx.provide(usage, {
+      fetch: async ({ apiKey }) => {
+        const response = await fetch(USAGE_URL, {
+          headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+        })
+        if (!response.ok) {
+          throw new Error(response.status === 401 ? "invalid api key" : `HTTP ${response.status}`)
+        }
+        return await response.json()
+      },
+    })
   },
   setup(ctx) {
     const [state, setState] = createSignal<State>({ kind: "loading" })
     const [updatedAt, setUpdatedAt] = createSignal<number>(0)
+    const usage = ctx.main(usageIpc(ctx.id))
     let disposed = false
 
     // ---- options (all optional, so the plugin works for any account/setup) ----
@@ -186,6 +264,16 @@ export default Plugin.define({
     const refreshSeconds = readNumber(ctx.options.refreshSeconds, 60, 15, 3600)
     const fixedLocation = readString(ctx.options.location)
     const openURL = readString(ctx.options.openUrl) ?? CONSOLE_URL
+
+    const readStoredApiKey = () => {
+      try {
+        return localStorage.getItem(API_KEY_STORAGE)?.trim() || undefined
+      } catch {
+        return undefined
+      }
+    }
+    const configuredApiKey = readString(ctx.options.apiKey)
+    let apiKey = configuredApiKey ?? readStoredApiKey()
 
     // The usage endpoint resolves the Console workspace from a location (a project
     // directory). Follow the active session, so the numbers always describe the
@@ -228,6 +316,54 @@ export default Plugin.define({
     const usageURL = () => {
       const current = state()
       return current.kind === "ready" ? current.info.workspace.usageURL : openURL
+    }
+
+    /* ---------- API key login ---------- */
+
+    const login = async () => {
+      const key = await ctx.dialogs.prompt({
+        title: ctx.t("login.title"),
+        description: ctx.t("login.description"),
+        placeholder: ctx.t("login.placeholder"),
+        secret: true,
+      })
+      const next = key?.trim()
+      if (!next) return
+
+      try {
+        await usage.fetch({ apiKey: next })
+      } catch {
+        ctx.toast.show({ variant: "error", title: ctx.t("login.invalid") })
+        return
+      }
+
+      apiKey = next
+      try {
+        localStorage.setItem(API_KEY_STORAGE, next)
+      } catch {
+        // Storage can be unavailable in restricted windows; the key still works for this session.
+      }
+      setState({ kind: "loading" })
+      render()
+      void load()
+      ctx.toast.show({ variant: "success", title: ctx.t("login.saved") })
+    }
+
+    const logout = () => {
+      if (configuredApiKey) {
+        ctx.toast.show({ variant: "error", title: ctx.t("login.configured") })
+        return
+      }
+      apiKey = undefined
+      try {
+        localStorage.removeItem(API_KEY_STORAGE)
+      } catch {
+        // Ignore storage failures; the in-memory key is already cleared.
+      }
+      setState({ kind: "loading" })
+      render()
+      void load()
+      ctx.toast.show({ variant: "success", title: ctx.t("login.removed") })
     }
 
     /* ---------- pill (native titlebar item) ---------- */
@@ -279,6 +415,22 @@ export default Plugin.define({
       group: ctx.t("command.group"),
       keywords: "opencode go console usage 额度 用量",
       run: () => ctx.system.openExternal(usageURL()),
+    }))
+
+    ctx.add(Command, (): Command => ({
+      id: "quota.login",
+      title: ctx.t("command.login"),
+      group: ctx.t("command.group"),
+      keywords: "opencode go api key login 登录 密钥",
+      run: () => void login(),
+    }))
+
+    ctx.add(Command, (): Command => ({
+      id: "quota.logout",
+      title: ctx.t("command.logout"),
+      group: ctx.t("command.group"),
+      keywords: "opencode go api key logout 清除 密钥",
+      run: () => logout(),
     }))
 
     /* ---------- hover card ---------- */
@@ -391,6 +543,7 @@ export default Plugin.define({
         <span>${escape(`${ctx.t("card.updated")}${ago(updatedAt())}`)}</span>
         <a class="goq-link" data-act="open">${escape(ctx.t("card.console"))}</a>
       </div>`
+      const loginLink = `<a class="goq-link" data-act="login">${escape(ctx.t("login.action"))}</a>`
 
       if (current.kind === "loading") {
         card.innerHTML = `<div class="goq-head"><span class="goq-title">${escape(ctx.t("card.title"))}</span></div>
@@ -399,23 +552,27 @@ export default Plugin.define({
       }
       if (current.kind === "anon") {
         card.innerHTML = `<div class="goq-head"><span class="goq-title">${escape(ctx.t("card.title"))}</span></div>
-          <div class="goq-empty">${escape(ctx.t("card.anon"))}</div>${footer}`
+          <div class="goq-empty">${escape(ctx.t("card.anon"))} ${loginLink}</div>${footer}`
         return
       }
       if (current.kind === "error") {
         card.innerHTML = `<div class="goq-head"><span class="goq-title">${escape(ctx.t("card.title"))}</span></div>
-          <div class="goq-empty">${escape(ctx.t("card.error"))}</div>${footer}`
+          <div class="goq-empty">${escape(ctx.t("card.error"))} ${loginLink}</div>${footer}`
         return
       }
 
       const info = current.info
       const go = info.go
       const workspace = info.workspace.name ?? info.workspace.id
+      const badges = `<span class="goq-badges">
+          ${go ? `<span class="goq-plan">${escape(ctx.t("card.plan"))}</span>` : ""}
+          ${apiKey ? `<span class="goq-plan">${escape(ctx.t("card.api"))}</span>` : ""}
+        </span>`
       const header = `<div class="goq-head">
           <span class="goq-title">${escape(ctx.t("card.title"))}</span>
-          ${go ? `<span class="goq-plan">${escape(ctx.t("card.plan"))}</span>` : ""}
+          ${badges}
         </div>
-        <div class="goq-ws">${escape(workspace)}${directory ? `<span class="goq-ws-sub"> · ${escape(projectName(directory))}</span>` : ""}</div>`
+        <div class="goq-ws">${escape(workspace)}${directory && !apiKey ? `<span class="goq-ws-sub"> · ${escape(projectName(directory))}</span>` : ""}</div>`
 
       if (!go) {
         const budget = info.budgets[0]
@@ -459,6 +616,11 @@ export default Plugin.define({
 
     card.addEventListener("click", (event) => {
       const target = event.target as HTMLElement | null
+      if (target?.dataset.act === "login") {
+        event.preventDefault()
+        void login()
+        return
+      }
       if (target?.dataset.act === "open") {
         event.preventDefault()
         ctx.system.openExternal(usageURL())
@@ -521,9 +683,31 @@ export default Plugin.define({
     const load = async () => {
       const ticket = ++sequence
       try {
-        const out = await ctx.client.usage.limits(directory ? { location: { directory } } : undefined)
-        if (disposed || ticket !== sequence) return
-        setState(out.data ? { kind: "ready", info: out.data as Info } : { kind: "anon" })
+        if (apiKey) {
+          const body = (await usage.fetch({ apiKey })) as { usage?: ApiUsage } & ApiUsage
+          if (disposed || ticket !== sequence) return
+          const apiUsage = body.usage ?? body
+          if (!apiUsage.rolling && !apiUsage.weekly && !apiUsage.monthly) {
+            setState({ kind: "anon" })
+          } else {
+            setState({
+              kind: "ready",
+              info: {
+                workspace: { id: "api-key", name: ctx.t("card.apiWorkspace"), usageURL: openURL },
+                go: {
+                  rolling: toMeter(apiUsage.rolling),
+                  weekly: toMeter(apiUsage.weekly),
+                  monthly: toMeter(apiUsage.monthly),
+                },
+                budgets: [],
+              },
+            })
+          }
+        } else {
+          const out = await ctx.client.usage.limits(directory ? { location: { directory } } : undefined)
+          if (disposed || ticket !== sequence) return
+          setState(out.data ? { kind: "ready", info: out.data as Info } : { kind: "anon" })
+        }
       } catch (error) {
         if (disposed || ticket !== sequence) return
         setState({ kind: "error", message: error instanceof Error ? error.message : String(error) })

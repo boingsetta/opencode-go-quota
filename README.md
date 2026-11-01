@@ -12,11 +12,11 @@ page.
 
 在 OpenCode Desktop 标题栏显示 OpenCode Go 额度。环形图标中，本月为白色底弧、本周为琥珀色、滚动 5 小时为蓝色顶层；悬停可查看三个窗口的用量百分比和重置倒计时，点击可打开 Console 用量页。
 
-- 不需要单独配置 API Key，复用 OpenCode 已登录的 Console 账号
+- 默认复用 OpenCode 已登录的 Console 账号，也可以改用 OpenCode Go API Key
 - 自动跟随当前会话所在的工作区
 - 每 60 秒刷新；切换会话或窗口重新获得焦点时也会刷新
 - 支持简体中文 / English，跟随 OpenCode 界面语言
-- 不读取、不保存任何凭据
+- 默认不读取、不保存凭据；API Key 模式会以明文保存在本地
 
 安装：
 
@@ -25,6 +25,16 @@ opencode plugin add github:boingsetta/opencode-go-quota
 ```
 
 或下载 [最新 Release](https://github.com/boingsetta/opencode-go-quota/releases/latest) 中的 zip，解压到 `%USERPROFILE%\.config\opencode\plugins\`，然后重启 OpenCode Desktop。
+
+### 用 API Key 登录
+
+如果 OpenCode 没有登录 Console，或者你想直接使用 OpenCode Go API Key：
+
+1. 打开命令面板。
+2. 选择 **OpenCode Go: 设置 OpenCode Go API Key**。
+3. 粘贴 API Key，点击“提交”。
+
+API Key 模式优先于 Console 登录。密钥会以明文保存在本地，并只发送到 `https://opencode.ai/zen/go/v1/usage`。要回到 Console 登录，运行 **OpenCode Go: 清除 OpenCode Go API Key**。
 
 要求 OpenCode Desktop 2.x。额度接口目前是实验性接口，官方响应格式变化时插件可能需要适配。
 
@@ -119,11 +129,17 @@ All optional, set on the plugin entry:
 | `refreshSeconds` | `60` | Poll interval, clamped to 15–3600. |
 | `location` | active session directory | Directory used to resolve the Console workspace. Pin it when one machine should always report one account. |
 | `openUrl` | Console root | Fallback link when the server returns no `usageURL`. |
+| `apiKey` | unset | OpenCode Go API key. If set, API-key mode wins over the Console session. Stored in plain text in `opencode.json`. |
 
 ## Data source
 
-`ctx.client.usage.limits({ location: { directory } })` → `GET /api/experimental/usage/limits`.
-No API key, no separate login, no credential access.
+Console mode uses `ctx.client.usage.limits({ location: { directory } })` →
+`GET /api/experimental/usage/limits`.
+
+API-key mode uses `GET https://opencode.ai/zen/go/v1/usage` with
+`Authorization: Bearer <key>`. The request runs in the desktop main process, because the
+endpoint's CORS preflight rejects the renderer's `Authorization` header. The API response is
+normalized into the same rolling/weekly/monthly meters.
 
 ```jsonc
 { "workspace": { "name": "Default", "usageURL": "…" },
@@ -132,24 +148,23 @@ No API key, no separate login, no credential access.
   "budgets": [] }
 ```
 
-## What the user must sign in to
+## Sign-in modes
 
-The plugin ships no credentials and has no login of its own. It asks the local OpenCode
-server, which uses the Console session the app already holds.
+The plugin ships no credentials. It supports two modes:
 
-Each user therefore needs, once:
+- **Console session (default):** it asks the local OpenCode server, which uses the Console
+  session the app already holds. Each user needs OpenCode Desktop 2.x, a signed-in Console
+  account — **Account** in the app, or `/connect` → **OpenCode Console** in the TUI — and a
+  Go or Go Plus subscription.
+- **API key:** open the command palette and choose **OpenCode Go: Set OpenCode Go API Key**.
+  The key is stored locally in plain text and sent only to
+  `https://opencode.ai/zen/go/v1/usage`. Use **OpenCode Go: Forget OpenCode Go API Key** to
+  return to Console mode.
 
-1. OpenCode Desktop 2.x.
-2. A signed-in OpenCode Console account — **Account** in the app, or `/connect` → **OpenCode
-   Console** in the TUI.
-3. A Go or Go Plus subscription (or Console credit) if they want bars rather than a budget.
-
-That is all. There is no API key field, no token to paste, and nothing stored by the plugin.
 `usage.limits` returns `data: null` for a location with no Console sign-in, and the card shows
-**未登录** with a link to the Console instead of failing.
-
-Switching accounts also happens in OpenCode, not in the card: the card always describes the
-account currently active for the location.
+**未登录** with links to the Console and API-key login. Switching Console accounts happens in
+OpenCode, not in the card: the card always describes the account currently active for the
+location.
 
 ## Install
 
