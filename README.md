@@ -135,10 +135,11 @@ account currently active for the location.
 
 ### From the release zip (no Node, no npm)
 
-1. Extract the archive under `%USERPROFILE%\.config\opencode\plugins\`. The folder name is
+1. Download the latest zip from [Releases](https://github.com/boingsetta/opencode-go-quota/releases/latest).
+2. Extract the archive under `%USERPROFILE%\.config\opencode\plugins\`. The folder name is
    arbitrary (the archive root is `opencode-go-quota`); it must contain `package.json` and
    `dist/gui-experimental.cjs` directly.
-2. Start or restart OpenCode Desktop.
+3. Start or restart OpenCode Desktop.
 
 Nothing else — package directories under `~/.config/opencode/plugins/` are discovered
 automatically, so the config stays untouched.
