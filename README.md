@@ -1,3 +1,8 @@
+<p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/English-111827?style=for-the-badge" alt="English"></a>
+  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-111827?style=for-the-badge" alt="简体中文"></a>
+</p>
+
 # opencode-go-quota
 
 An OpenCode Desktop GUI plugin that shows the OpenCode Go allowance in the titlebar. A ring pill sits in the window titlebar (top right):
@@ -7,36 +12,6 @@ Hover it to open a card with the same numbers as bars; click it to open the Cons
 page.
 
 ![hover card](docs/placement.png)
-
-## 中文说明
-
-在 OpenCode Desktop 标题栏显示 OpenCode Go 额度。环形图标中，本月为白色底弧、本周为琥珀色、滚动 5 小时为蓝色顶层；悬停可查看三个窗口的用量百分比和重置倒计时，点击可打开 Console 用量页。
-
-- 默认复用 OpenCode 已登录的 Console 账号，也可以改用 OpenCode Go API Key
-- 自动跟随当前会话所在的工作区
-- 每 60 秒刷新；切换会话或窗口重新获得焦点时也会刷新
-- 支持简体中文 / English，跟随 OpenCode 界面语言
-- 默认不读取、不保存凭据；API Key 模式会以明文保存在本地
-
-安装：
-
-```powershell
-opencode plugin add github:boingsetta/opencode-go-quota
-```
-
-或下载 [最新 Release](https://github.com/boingsetta/opencode-go-quota/releases/latest) 中的 zip，解压到 `%USERPROFILE%\.config\opencode\plugins\`，然后重启 OpenCode Desktop。
-
-### 用 API Key 登录
-
-如果 OpenCode 没有登录 Console，或者你想直接使用 OpenCode Go API Key：
-
-1. 悬停标题栏的环形图标，打开额度卡片。
-2. 点击卡片底部的 **使用 API Key**。
-3. 在卡片里粘贴 API Key，点击 **登录**。
-
-也可以打开命令面板，选择 **OpenCode Go: 设置 OpenCode Go API Key**。API Key 模式优先于 Console 登录。密钥会以明文保存在本地，并只发送到 `https://opencode.ai/zen/go/v1/usage`。要回到 Console 登录，点击卡片底部的 **退出 API Key**，或运行 **OpenCode Go: 清除 OpenCode Go API Key**。
-
-要求 OpenCode Desktop 2.x。额度接口目前是实验性接口，官方响应格式变化时插件可能需要适配。
 
 ## Whose quota is it?
 
